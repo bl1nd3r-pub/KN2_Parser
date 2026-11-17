@@ -1,21 +1,18 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import { useListingsStore } from "@/stores/listings";
 
 const store = useListingsStore();
-const query = ref("");
 </script>
 
 <template>
   <div class="search-bar">
     <input
       type="text"
-      v-model="query"
+      v-model="store.filters.search"
       placeholder="Поиск по названию объявления..."
-      @input="store.setSearch(query)"
       class="search-input"
     />
-    <button @click="store.setSearch(''); query = ''" class="search-clear" v-if="query">×</button>
+    <button @click="store.setSearch('')" class="search-clear" v-if="store.filters.search">×</button>
   </div>
 </template>
 
@@ -24,6 +21,8 @@ const query = ref("");
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
+  flex: 1;
+  min-width: 300px;
 }
 
 .search-input {

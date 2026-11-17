@@ -1,4 +1,4 @@
-cd"""
+"""
 Бэкенд для доски объявлений об аренде жилья.
 
 Endpoints:
@@ -62,6 +62,8 @@ async def run_parser() -> RunParserResponse:
             [sys.executable, str(PARSER_PATH)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=300,
             cwd=str(BASE_DIR),
         )

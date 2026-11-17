@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useListingsStore } from "@/stores/listings";
 
 const store = useListingsStore();
 
 const priceMin = ref<string>("");
 const priceMax = ref<string>("");
+
+// Применяем фильтр цены сразу при вводе, а не только по потере фокуса
+watch([priceMin, priceMax], ([min, max]) => {
+  store.setPriceRange(min ? Number(min) : null, max ? Number(max) : null);
+});
 </script>
 
 <template>
@@ -14,26 +19,26 @@ const priceMax = ref<string>("");
 
     <div class="filter-group">
       <label>Цена от:</label>
-      <input type="number" v-model="priceMin" placeholder=" мин" @change="store.setPriceRange(priceMin ? Number(priceMin) : null, priceMax ? Number(priceMax) : null)" class="filter-input" />
+      <input type="number" v-model="priceMin" placeholder=" мин" class="filter-input" />
     </div>
 
     <div class="filter-group">
       <label>Цена до:</label>
-      <input type="number" v-model="priceMax" placeholder=" макс" @change="store.setPriceRange(priceMin ? Number(priceMin) : null, priceMax ? Number(priceMax) : null)" class="filter-input" />
+      <input type="number" v-model="priceMax" placeholder=" макс" class="filter-input" />
     </div>
 
     <div class="filter-group">
       <label>Количество комнат:</label>
-      <select v-model.number="store.filters.rooms" @change="store.setRooms(store.filters.rooms)" class="filter-select">
-        <option value="">Любые</option>
+      <select v-model="store.filters.rooms" class="filter-select">
+        <option :value="null">Любые</option>
         <option v-for="r in store.roomsOptions" :key="r" :value="r">{{ r }}-к.</option>
       </select>
     </div>
 
     <div class="filter-group">
       <label>Район:</label>
-      <select v-model="store.filters.district" @change="store.setDistrict(store.filters.district)" class="filter-select">
-        <option value="">Все районы</option>
+      <select v-model="store.filters.district" class="filter-select">
+        <option :value="null">Все районы</option>
         <option v-for="d in store.districts" :key="d" :value="d">{{ d }}</option>
       </select>
     </div>

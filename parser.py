@@ -11,10 +11,16 @@
 2. Собираем уникальные ID объявлений (ссылки вида /23104684/)
 3. Для каждого ID загружаем детальную страницу и извлекаем все поля
 4. Сохраняем результат в src/data/listings.json
+
+Запуск:
+    python parser.py                 # спарсить все объявления со страницы
+    python parser.py --limit 5       # спарсить только первые 5 (для проверки)
+    python parser.py --out test.json # сохранить в другой файл
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import time
@@ -27,6 +33,10 @@ from bs4 import BeautifulSoup
 
 BASE_URL = "https://www.kvartirant.ru"
 LIST_URL = f"{BASE_URL}/Moskva/sniat-kvartiru/"
+
+# Путь по умолчанию — относительно расположения самого скрипта,
+# чтобы парсер можно было запускать из любой директории
+DEFAULT_OUT_PATH = Path(__file__).resolve().parent / "src" / "data" / "listings.json"
 
 HEADERS = {
     "User-Agent": (
@@ -50,6 +60,8 @@ class Listing:
     description: Optional[str]
     photos: list[str]
     source_url: Optional[str]
+    address: Optional[str] = None
+    metro: Optional[str] = None
 
 
 def fetch_html(url: str) -> Optional[str]:
@@ -168,6 +180,12 @@ def parse_detail_page(html: str, listing_id: str) -> Optional[Listing]:
         if len(parts) >= 2:
             district = parts[1]
 
+    # Ближайшее метро
+    metro = extract_text_after_label(soup, "Метро")
+    if metro:
+        # На сайте значение выглядит как "Метро Смоленская" — убираем дублирующее слово
+        metro = re.sub(r"^метро\s+", "", metro, flags=re.IGNORECASE).strip() or None
+
     # Площадь — из элемента с "Площадь:"
     area_el = find_element_containing(soup, "Площадь:")
     area = None
@@ -197,10 +215,29 @@ def parse_detail_page(html: str, listing_id: str) -> Optional[Listing]:
         description=description,
         photos=photos,
         source_url=f"{BASE_URL}/{listing_id}/",
+        address=address,
+        metro=metro,
     )
 
 
 def main() -> None:
+    arg_parser = argparse.ArgumentParser(
+        description="Парсер объявлений об аренде жилья с kvartirant.ru"
+    )
+    arg_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Максимальное число объявлений для парсинга (по умолчанию — все)",
+    )
+    arg_parser.add_argument(
+        "--out",
+        type=Path,
+        default=DEFAULT_OUT_PATH,
+        help="Куда сохранить JSON (по умолчанию src/data/listings.json)",
+    )
+    args = arg_parser.parse_args()
+
     print("=== Парсер объявлений kvartirant.ru ===")
 
     html = fetch_html(LIST_URL)
@@ -209,6 +246,8 @@ def main() -> None:
         return
 
     listing_ids = collect_listing_ids(html)
+    if args.limit is not None:
+        listing_ids = listing_ids[: args.limit]
     print(f"[+] Найдено уникальных объявлений: {len(listing_ids)}")
 
     results: list[Listing] = []
@@ -222,7 +261,7 @@ def main() -> None:
                 print(f"  [{i}/{len(listing_ids)}] {lid}: {listing.title[:50]}... price={listing.price}")
         time.sleep(1)
 
-    out_path = Path("src/data/listings.json")
+    out_path: Path = args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     data = [asdict(l) for l in results]

@@ -17,4 +17,11 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    watch: {
+      // listings.json перезаписывается парсером; свежие данные приложение
+      // подтягивает через fetch, поэтому HMR-перезагрузка страницы не нужна
+      ignored: ['**/src/data/listings.json'],
+    },
+  },
 })

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useListingsStore } from "@/stores/listings";
 import { useFavoritesStore } from "@/stores/favorites";
+import type { Listing } from "@/types/listing";
 import SearchBar from "@/components/SearchBar.vue";
 import FilterPanel from "@/components/FilterPanel.vue";
 import ListingCard from "@/components/ListingCard.vue";
@@ -11,7 +12,42 @@ import EmptyState from "@/components/EmptyState.vue";
 const store = useListingsStore();
 const favoritesStore = useFavoritesStore();
 
-const favoriteCount = computed(() => favoritesStore.favoriteIds.length);
+const API_URL = "http://localhost:8000";
+
+// Избранные объявления целиком.
+// ID, которых больше нет в данных (например, после перезапуска парсера),
+// отфильтровываются — приложение не должно падать.
+const favoriteListings = computed(() =>
+  favoritesStore.favoriteIds
+    .map((id) => store.getListingById(id))
+    .filter((item): item is Listing => item !== undefined),
+);
+
+// Правильное склонение: 1 объявление, 2 объявления, 5 объявлений
+const foundLabel = computed(() => {
+  const n = store.filteredListings.length;
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "объявление найдено";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "объявления найдено";
+  return "объявлений найдено";
+});
+
+// Применены ли поиск/фильтры (для подписи «из N»)
+const filtersActive = computed(
+  () =>
+    store.filters.search !== "" ||
+    store.filters.priceMin !== null ||
+    store.filters.priceMax !== null ||
+    store.filters.rooms !== null ||
+    store.filters.district !== null,
+);
+
+// При загрузке страницы пробуем взять свежие данные с бэкенда.
+// Если он не запущен — работаем со статическим listings.json из сборки.
+onMounted(() => {
+  store.fetchFromBackend();
+});
 
 // Состояние парсера
 const parserStatus = ref<"idle" | "running" | "done" | "error">("idle");
@@ -19,25 +55,18 @@ const parserMessage = ref("");
 
 async function runParser() {
   parserStatus.value = "running";
-  parserMessage.value = "Запуск парсера...";
+  parserMessage.value = "Парсинг… это может занять пару минут";
   try {
-    const resp = await fetch("http://localhost:8000/run-parser", {
-      method: "POST",
-    });
+    const resp = await fetch(`${API_URL}/run-parser`, { method: "POST" });
     const data = await resp.json();
-    if (resp.ok) {
+    if (resp.ok && data.ok) {
+      // Подтягиваем обновлённые объявления в стор без перезагрузки страницы
+      await store.fetchFromBackend();
       parserStatus.value = "done";
       parserMessage.value = `Готово! Найдено объявлений: ${data.count}`;
-      // Перезагружаем данные объявлений
-      const listingsResp = await fetch("http://localhost:8000/listings");
-      if (listingsResp.ok) {
-        const newListings = await listingsResp.json();
-        // Обновляем стор (в реальном приложении здесь бы была перезагрузка)
-        window.location.reload();
-      }
     } else {
       parserStatus.value = "error";
-      parserMessage.value = data.error || "Ошибка запуска парсера";
+      parserMessage.value = data.message || "Ошибка запуска парсера";
     }
   } catch (err) {
     parserStatus.value = "error";
@@ -56,7 +85,7 @@ async function runParser() {
           <nav class="app-nav">
             <button @click="store.showList()" :class="{ active: store.view === 'list' }">Объявления</button>
             <button @click="store.showFavorites()" :class="{ active: store.view === 'favorites' }">
-              Избранное <span class="badge">{{ favoriteCount }}</span>
+              Избранное <span class="badge">{{ favoriteListings.length }}</span>
             </button>
             <button
               @click="runParser"
@@ -83,16 +112,16 @@ async function runParser() {
         <h2>Избранное</h2>
         <button @click="store.showList()" class="back-btn">← Назад к списку</button>
 
-        <div v-if="favoritesStore.favoriteIds.length === 0" class="empty-favorites">
+        <div v-if="favoriteListings.length === 0" class="empty-favorites">
           <p>У вас пока нет избранных объявлений.</p>
         </div>
 
         <div v-else class="listings-grid">
           <ListingCard
-            v-for="id in favoritesStore.favoriteIds"
-            :key="id"
-            :listing="store.getListingById(id)"
-            @view="store.openListing(id)"
+            v-for="listing in favoriteListings"
+            :key="listing.id"
+            :listing="listing"
+            @view="store.openListing(listing.id)"
           />
         </div>
       </div>
@@ -106,10 +135,8 @@ async function runParser() {
 
         <div class="results-info">
           <strong>{{ store.filteredListings.length }}</strong>
-          объявлений найдено
-          <span v-if="store.filters.search || store.filters.priceMin !== null || store.filters.priceMax !== null || store.filters.rooms !== null || store.filters.district !== null">
-            из {{ store.allListings.length }}
-          </span>
+          {{ foundLabel }}
+          <span v-if="filtersActive"> из {{ store.allListings.length }}</span>
         </div>
 
         <div v-if="store.filteredListings.length === 0" class="empty-wrapper">
@@ -230,6 +257,7 @@ async function runParser() {
 
 .controls {
   display: flex;
+  align-items: flex-start;
   gap: 20px;
   flex-wrap: wrap;
   margin-bottom: 20px;
@@ -247,7 +275,7 @@ async function runParser() {
 
 .listings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
   gap: 20px;
 }
 

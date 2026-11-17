@@ -3,6 +3,8 @@ import { ref, computed } from "vue";
 import type { Listing, Filters } from "@/types/listing";
 import listingsData from "@/data/listings.json";
 
+const API_URL = "http://localhost:8000";
+
 export const useListingsStore = defineStore("listings", () => {
   // Все объявления из JSON
   const allListings = ref<Listing[]>(listingsData as Listing[]);
@@ -109,16 +111,6 @@ export const useListingsStore = defineStore("listings", () => {
     filters.value.priceMax = max;
   }
 
-  // Установить фильтр комнат
-  function setRooms(rooms: number | null) {
-    filters.value.rooms = rooms;
-  }
-
-  // Установить фильтр района
-  function setDistrict(district: string | null) {
-    filters.value.district = district;
-  }
-
   // Открыть детальный просмотр объявления
   function openListing(id: string) {
     selectedListingId.value = id;
@@ -146,6 +138,26 @@ export const useListingsStore = defineStore("listings", () => {
     return allListings.value.find((item) => item.id === id);
   };
 
+  // Заменить список объявлений (например, после парсинга)
+  function setListings(listings: Listing[]) {
+    allListings.value = listings;
+  }
+
+  // Загрузить свежие объявления с бэкенда (FastAPI).
+  // Если бэкенд не запущен — возвращает false, остаются данные из listings.json.
+  async function fetchFromBackend(): Promise<boolean> {
+    try {
+      const resp = await fetch(`${API_URL}/listings`);
+      if (!resp.ok) return false;
+      const data: unknown = await resp.json();
+      if (!Array.isArray(data)) return false;
+      setListings(data as Listing[]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   return {
     allListings,
     filters,
@@ -157,12 +169,12 @@ export const useListingsStore = defineStore("listings", () => {
     resetFilters,
     setSearch,
     setPriceRange,
-    setRooms,
-    setDistrict,
     openListing,
     closeListing,
     showFavorites,
     showList,
     getListingById,
+    setListings,
+    fetchFromBackend,
   };
 });

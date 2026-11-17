@@ -1,53 +1,98 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import MissingField from "./MissingField.vue";
 
 const props = defineProps<{
   photos: string[];
 }>();
 
-const emit = defineEmits(["close"]);
-
+// Индекс текущего фото и состояние полноэкранной модалки
 const activeIndex = ref(0);
+const modalOpen = ref(false);
 
-const openImage = (index: number) => {
+// Если сменилось объявление — сбрасываем состояние галереи
+watch(
+  () => props.photos,
+  () => {
+    activeIndex.value = 0;
+    modalOpen.value = false;
+  },
+);
+
+const openModal = (index: number) => {
   activeIndex.value = index;
+  modalOpen.value = true;
+};
+
+const closeModal = () => {
+  modalOpen.value = false;
+};
+
+const showPrev = () => {
+  activeIndex.value = (activeIndex.value + props.photos.length - 1) % props.photos.length;
+};
+
+const showNext = () => {
+  activeIndex.value = (activeIndex.value + 1) % props.photos.length;
 };
 </script>
 
 <template>
   <div class="photo-gallery">
-    <div v-if="props.photos.length" class="gallery-thumbs">
+    <template v-if="photos.length">
+      <!-- Главное фото (клик открывает полноэкранный просмотр) -->
       <img
-        v-for="(photo, index) in props.photos"
-        :key="index"
-        :src="photo"
-        :alt="`Фото ${index + 1}`"
-        class="thumb"
-        :class="{ active: activeIndex === index }"
-        @click="openImage(index)"
+        :src="photos[activeIndex]"
+        :alt="`Фото ${activeIndex + 1}`"
+        class="main-photo"
+        @click="openModal(activeIndex)"
       />
-    </div>
+
+      <!-- Миниатюры -->
+      <div class="gallery-thumbs">
+        <img
+          v-for="(photo, index) in photos"
+          :key="index"
+          :src="photo"
+          :alt="`Миниатюра ${index + 1}`"
+          class="thumb"
+          :class="{ active: activeIndex === index }"
+          @click="activeIndex = index"
+        />
+      </div>
+
+      <!-- Полноэкранная модалка -->
+      <div v-if="modalOpen" class="gallery-modal">
+        <div class="modal-overlay" @click="closeModal"></div>
+        <div class="modal-content" @click.stop>
+          <img :src="photos[activeIndex]" :alt="`Фото ${activeIndex + 1}`" class="modal-img" />
+          <div class="modal-nav">
+            <button @click="showPrev" aria-label="Предыдущее фото">‹</button>
+            <span>Фото {{ activeIndex + 1 }} из {{ photos.length }}</span>
+            <button @click="showNext" aria-label="Следующее фото">›</button>
+          </div>
+          <button class="modal-close" @click="closeModal">Закрыть</button>
+        </div>
+      </div>
+    </template>
+
     <div v-else class="no-photos">
       <MissingField label="Фотографии отсутствуют" />
-    </div>
-
-    <div v-if="props.photos.length && activeIndex >= 0" class="gallery-modal">
-      <div class="modal-overlay" @click="emit('close')"></div>
-      <div class="modal-content" @click.stop>
-        <img :src="props.photos[activeIndex]" :alt="`Фото ${activeIndex + 1}`" class="modal-img" />
-        <div class="modal-nav">
-          <button @click="activeIndex = (activeIndex + props.photos.length - 1) % props.photos.length">‹</button>
-          <span>Фото {{ activeIndex + 1 }} из {{ props.photos.length }}</span>
-          <button @click="activeIndex = (activeIndex + 1) % props.photos.length">›</button>
-        </div>
-        <button class="modal-close" @click="emit('close')">Закрыть</button>
-      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.main-photo {
+  width: 100%;
+  max-height: 380px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: zoom-in;
+  margin-bottom: 12px;
+  background: #f5f5f5;
+}
+
 .gallery-thumbs {
   display: flex;
   gap: 8px;

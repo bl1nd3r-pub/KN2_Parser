@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useListingsStore } from "@/stores/listings";
 import { useFavoritesStore } from "@/stores/favorites";
-import type { Listing } from "@/types/listing";
 import MissingField from "./MissingField.vue";
 import PhotoGallery from "./PhotoGallery.vue";
 
@@ -10,21 +9,25 @@ const store = useListingsStore();
 const favoritesStore = useFavoritesStore();
 
 const props = defineProps<{
-  listingId: string;
+  listingId: string | null;
 }>();
 
-const listing = computed(() => store.getListingById(props.listingId));
-const isFavorite = computed(() => favoritesStore.isFavorite(props.listingId));
+const listing = computed(() =>
+  props.listingId ? store.getListingById(props.listingId) : undefined,
+);
+const isFavorite = computed(
+  () => props.listingId !== null && favoritesStore.isFavorite(props.listingId),
+);
 
 const toggleFavorite = () => {
-  favoritesStore.toggle(props.listingId);
+  if (props.listingId !== null) {
+    favoritesStore.toggle(props.listingId);
+  }
 };
 
 const closeDetail = () => {
   store.closeListing();
 };
-
-const photoModalOpen = ref(false);
 </script>
 
 <template>
@@ -42,12 +45,12 @@ const photoModalOpen = ref(false);
 
     <div class="detail-content">
       <div class="detail-images">
-        <PhotoGallery :photos="listing.photos" @close="photoModalOpen = false" />
+        <PhotoGallery :photos="listing.photos" />
       </div>
 
       <div class="detail-info">
         <div class="detail-price">
-          <span v-if="listing.price !== null">{{ listing.price }} ₽ / месяц</span>
+          <span v-if="listing.price !== null">{{ listing.price.toLocaleString("ru-RU") }} ₽ / месяц</span>
           <span v-else><MissingField label="Цена не указана" /></span>
         </div>
 

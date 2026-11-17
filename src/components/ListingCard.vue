@@ -39,7 +39,7 @@ const toggleFavorite = () => {
       <h3 class="card-title">{{ listing.title }}</h3>
 
       <div class="card-meta">
-        <span v-if="listing.price !== null" class="card-price">{{ listing.price }} ₽</span>
+        <span v-if="listing.price !== null" class="card-price">{{ listing.price.toLocaleString("ru-RU") }} ₽</span>
         <span v-else class="card-price missing">
           <MissingField label="Цена не указана" />
         </span>
@@ -79,7 +79,9 @@ const toggleFavorite = () => {
 
 .card-image {
   position: relative;
-  width: 300px;
+  width: 45%;
+  max-width: 300px;
+  min-width: 170px;
   height: 200px;
   flex-shrink: 0;
   background: #f5f5f5;
@@ -171,6 +173,10 @@ const toggleFavorite = () => {
   color: #555;
   line-height: 1.4;
   flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-details-btn {
